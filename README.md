@@ -6,7 +6,8 @@
 </div>
 
 ## 🛡 1과제 (*Infrastructure configuration & Security enhancements*) 🔐
-- 1과제 솔루션(Assignmnet Solutions) : [[Infrastructure Security]()]
+- 핵심 기술(Core Skills) : ``Docker, Tomcat, MariaDB``
+- 1과제 솔루션(Assignmnet Solutions) : [[Infrastructure Security](https://github.com/NullBins/SecureNational2025/blob/main/Project1_InfraSecurity.md)]
 
 ## 🧱 2과제 (*Network security device settings*) ⚒
 - 핵심 기술(Core Skills) : ``UTM, Traffic Control``
