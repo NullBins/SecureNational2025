@@ -41,12 +41,14 @@ nano /etc/rc.local
 >```vim
 >#!/bin/bash
 >
+>sysctl --system
 ># Virtual Network Bridge
 >ip link add kolo-net-host link ens33 type macvlan mode bridge
 >ip addr add 192.168.127.254/24 dev kolo-net-host
->ip link set kolo-net-host
+>ip link set kolo-net-host up
 >ip route add 192.168.127.10/32 dev kolo-net-host
 >ip route add 192.168.127.20/32 dev kolo-net-host
+>ip addr show kolo-net-host
 >
 >exit 0
 >```
@@ -136,18 +138,20 @@ docker network ls
 touch /etc/rc.local
 chmod +x /etc/rc.local
 nano /etc/rc.local
----
+# --- #
 #!/bin/bash
 
+sysctl --system
 # Virtual Network Bridge
 ip link add kolo-net-host link ens33 type macvlan mode bridge
 ip addr add 192.168.127.254/24 dev kolo-net-host
-ip link set kolo-net-host
+ip link set kolo-net-host up
 ip route add 192.168.127.10/32 dev kolo-net-host
 ip route add 192.168.127.20/32 dev kolo-net-host
+ip addr show kolo-net-host
 
 exit 0
----
+# --- #
 systemctl enable rc-local
 systemctl restart rc-local
 ip addr show kolo-net-host
@@ -171,10 +175,10 @@ sed -i "s/localhost/192.168.127.10/g" /home/kolo_user/apache-tomcat-9.0.89/webap
 mkdir ./tomcat-build; cd ./tomcat-build
 cp -r /home/kolo_user/apache-tomcat-9.0.89/ ./
 nano Dockerfile
----
+# --- #
 FROM tomcat:9.0
 COPY ./apache-tomcat-9.0.89/ /usr/local/tomcat/
----
+# --- #
 docker build -t tomcat:kolo .
 docker run -d --name www --hostname www --restart always --network kolo-net --ip 192.168.127.20 tomcat:kolo
 ```
