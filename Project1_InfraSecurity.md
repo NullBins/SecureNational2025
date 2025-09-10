@@ -32,9 +32,8 @@ nano /etc/netplan/config.yaml
 >  version: 2
 >```
 ```vim
+netplan apply
 docker network create -d macvlan --subnet 192.168.127.0/24 --gateway 192.168.127.1 -o parent=ens33 kolo-net
-touch /etc/rc.local
-chmod +x /etc/rc.local
 ```
 ```vim
 nano /etc/rc.local
@@ -49,12 +48,13 @@ nano /etc/rc.local
 >ip link set kolo-net-host up
 >ip route add 192.168.127.10/32 dev kolo-net-host
 >ip route add 192.168.127.20/32 dev kolo-net-host
->ip addr show kolo-net-host
+>ip addr show kolo-net-host | grep inet
+>ip route show | grep kolo-net
 >
 >exit 0
 >```
 ```vim
-systemctl enable rc-local
+chmod +x /etc/rc.local
 systemctl restart rc-local
 ```
 ### < *Checking* >
@@ -69,18 +69,23 @@ ip addr show kolo-net-host
 ### < *Configuration* >
 - [ server ] : VM
 ```vim
-mysqldump -u root -p --no-data midsv > midsv_schema.sql
-mysqldump -u root -p --no-create-info midsv > midsv_data.sql
+nano /etc/mysql/conf.d/mysql.cnf
+```
+>```ini
+>[mysqld]
+>lower_case_table_names=1
+>```
+```vim
+mysqldump -u root -p midsv > ./midsv_backup.sql
 mysqldump -u root -p mysql_bk > ./mysql_bk_backup.sql
 docker tag mariadb:latest mariadb:kolo
-docker run -d --name kolodb --hostname kolodb --restart always --network kolo-net --ip 192.168.127.10 -e MARIADB_ROOT_PASSWORD=user01 mariadb:kolo
+docker run -d --name kolodb --hostname kolodb --restart always --network kolo-net --ip 192.168.127.10 -e MARIADB_ROOT_PASSWORD=user01 -v /etc/mysql/conf.d/mysql.cnf:/etc/mysql/conf.d/custom.cnf mariadb:kolo
 mariadb -h 192.168.127.10 -u root -puser01 -e "grant all privileges on *.* to 'dbroot'@'%' identified by 'asd123'"
 mariadb -h 192.168.127.10 -u root -puser01 -e 'flush privileges'
 mariadb -h 192.168.127.10 -u root -puser01 -e 'create database midsv'
 mariadb -h 192.168.127.10 -u root -puser01 -e 'create database mysql_bk'
-mariadb -h 192.168.127.10 -u root -puser01 midsv < ./midsv_schema.sql
-mariadb -h 192.168.127.10 -u root -puser01 midsv < ./midsv_data.sql
-mariadb -h 192.168.127.10 -u root -puser01 mysql_bk < /mysql_bk_backup.sql
+mariadb -h 192.168.127.10 -u root -puser01 midsv < ./midsv_backup.sql
+mariadb -h 192.168.127.10 -u root -puser01 mysql_bk < ./mysql_bk_backup.sql
 ```
 ### < *Checking* >
 - [ server ] : VM
@@ -94,13 +99,12 @@ mariadb -h 192.168.127.10 -u root -puser01 midsv -e 'select * from board'
 ### < *Configuration* >
 - [ server ] : VM
 ```vim
-grep -r "localhost" /home/kolo_user/apache-tomcat-9.0.89/webapps/midsv/
+grep -r "3306" /home/kolo_user/apache-tomcat-9.0.89/webapps/midsv/
 sed -i "s/localhost/192.168.127.10/g" /home/kolo_user/apache-tomcat-9.0.89/webapps/midsv/WEB-INF/spring/root-context.xml
 sed -i "s/localhost/192.168.127.10/g" /home/kolo_user/apache-tomcat-9.0.89/webapps/midsv/WEB-INF/classes/config/value.properties
 /home/kolo_user/apache-tomcat-9.0.89/bin/shutdown.sh
 /home/kolo_user/apache-tomcat-9.0.89/bin/startup.sh
-mkdir ./tomcat-build; cd ./tomcat-build
-cp -r /home/kolo_user/apache-tomcat-9.0.89/ ./
+cd /home/kolo_user/
 ```
 ```vim
 nano Dockerfile
@@ -112,12 +116,16 @@ nano Dockerfile
 ```vim
 docker build -t tomcat:kolo .
 docker run -d --name www --hostname www --restart always --network kolo-net --ip 192.168.127.20 tomcat:kolo
+sed -i "s/192.168.127.10/localhost/g" /home/kolo_user/apache-tomcat-9.0.89/webapps/midsv/WEB-INF/spring/root-context.xml
+sed -i "s/192.168.127.10/localhost/g" /home/kolo_user/apache-tomcat-9.0.89/webapps/midsv/WEB-INF/classes/config/value.properties
+/home/kolo_user/apache-tomcat-9.0.89/bin/shutdown.sh
+/home/kolo_user/apache-tomcat-9.0.89/bin/startup.sh
 ```
 ### < *Checking* >
 - [ server ] : VM
 ```vim
 docker ps -a
-curl http://192.168.127.20:8080
+curl -I http://192.168.127.20:8080
 ```
 - [ HOST ] -> Host Desktop PC
 ```powershell
@@ -125,7 +133,7 @@ ping -4 -n 1 192.168.127.129
 ping -4 -n 1 192.168.127.254
 ping -4 -n 1 192.168.127.10
 ping -4 -n 1 192.168.127.20
-curl http://192.168.127.20:8080
+curl -I http://192.168.127.20:8080
 ```
 
 ---
@@ -134,14 +142,11 @@ curl http://192.168.127.20:8080
 - *Shell script code* : `Set all assignment items.`
 ```vim
 #!/bin/bash
+## ----------------------------------------------------------------------- ##
 docker network create -d macvlan --subnet 192.168.127.0/24 --gateway 192.168.127.1 -o parent=ens33 kolo-net
-docker network ls
-touch /etc/rc.local
-chmod +x /etc/rc.local
 nano /etc/rc.local
 # --- #
 #!/bin/bash
-
 sysctl --system
 # Virtual Network Bridge
 ip link add kolo-net-host link ens33 type macvlan mode bridge
@@ -149,32 +154,33 @@ ip addr add 192.168.127.254/24 dev kolo-net-host
 ip link set kolo-net-host up
 ip route add 192.168.127.10/32 dev kolo-net-host
 ip route add 192.168.127.20/32 dev kolo-net-host
-ip addr show kolo-net-host
-
+ip addr show kolo-net-host | grep inet
+ip route show | grep kolo-net
 exit 0
 # --- #
-systemctl enable rc-local
+chmod +x /etc/rc.local
 systemctl restart rc-local
-ip addr show kolo-net-host
-mysqldump -u root -p --no-data midsv > midsv_schema.sql
-mysqldump -u root -p --no-create-info midsv > midsv_data.sql
+nano /etc/mysql/conf.d/mysql.cnf
+# --- #
+[mysqld]
+lower_case_table_names=1
+# --- #
+mysqldump -u root -p midsv > ./midsv_backup.sql
 mysqldump -u root -p mysql_bk > ./mysql_bk_backup.sql
 docker tag mariadb:latest mariadb:kolo
-docker run -d --name kolodb --hostname kolodb --restart always --network kolo-net --ip 192.168.127.10 -e MARIADB_ROOT_PASSWORD=user01 mariadb:kolo
+docker run -d --name kolodb --hostname kolodb --restart always --network kolo-net --ip 192.168.127.10 -e MARIADB_ROOT_PASSWORD=user01 -v /etc/mysql/conf.d/mysql.cnf:/etc/mysql/conf.d/custom.cnf mariadb:kolo
 mariadb -h 192.168.127.10 -u root -puser01 -e "grant all privileges on *.* to 'dbroot'@'%' identified by 'asd123'"
 mariadb -h 192.168.127.10 -u root -puser01 -e 'flush privileges'
 mariadb -h 192.168.127.10 -u root -puser01 -e 'create database midsv'
 mariadb -h 192.168.127.10 -u root -puser01 -e 'create database mysql_bk'
-mariadb -h 192.168.127.10 -u root -puser01 midsv < ./midsv_schema.sql
-mariadb -h 192.168.127.10 -u root -puser01 midsv < ./midsv_data.sql
-mariadb -h 192.168.127.10 -u root -puser01 mysql_bk < /mysql_bk_backup.sql
-grep -r "localhost" /home/kolo_user/apache-tomcat-9.0.89/webapps/midsv/
+mariadb -h 192.168.127.10 -u root -puser01 midsv < ./midsv_backup.sql
+mariadb -h 192.168.127.10 -u root -puser01 mysql_bk < ./mysql_bk_backup.sql
+grep -r "3306" /home/kolo_user/apache-tomcat-9.0.89/webapps/midsv/
 sed -i "s/localhost/192.168.127.10/g" /home/kolo_user/apache-tomcat-9.0.89/webapps/midsv/WEB-INF/spring/root-context.xml
 sed -i "s/localhost/192.168.127.10/g" /home/kolo_user/apache-tomcat-9.0.89/webapps/midsv/WEB-INF/classes/config/value.properties
 /home/kolo_user/apache-tomcat-9.0.89/bin/shutdown.sh
 /home/kolo_user/apache-tomcat-9.0.89/bin/startup.sh
-mkdir ./tomcat-build; cd ./tomcat-build
-cp -r /home/kolo_user/apache-tomcat-9.0.89/ ./
+cd /home/kolo_user/
 nano Dockerfile
 # --- #
 FROM tomcat:9.0
@@ -182,6 +188,11 @@ COPY ./apache-tomcat-9.0.89/ /usr/local/tomcat/
 # --- #
 docker build -t tomcat:kolo .
 docker run -d --name www --hostname www --restart always --network kolo-net --ip 192.168.127.20 tomcat:kolo
+sed -i "s/192.168.127.10/localhost/g" /home/kolo_user/apache-tomcat-9.0.89/webapps/midsv/WEB-INF/spring/root-context.xml
+sed -i "s/192.168.127.10/localhost/g" /home/kolo_user/apache-tomcat-9.0.89/webapps/midsv/WEB-INF/classes/config/value.properties
+/home/kolo_user/apache-tomcat-9.0.89/bin/shutdown.sh
+/home/kolo_user/apache-tomcat-9.0.89/bin/startup.sh
+## ----------------------------------------------------------------------- ##
 ```
 
 ---
