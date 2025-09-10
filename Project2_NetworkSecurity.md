@@ -13,7 +13,7 @@
 
 ---
 
-## 0) 전체 토폴로지 & 주소 요약
+## 0) 전체 토폴로지(주소 요약) 호스트 기본 설정 사항
 
 * **네트워크 대역**
 
@@ -21,11 +21,11 @@
   * DMZ: `210.111.10.128/25`
   * OUTSIDE: `210.111.10.0/25`
   * MOBILITY: `203.150.10.0/24`
-* **아이피**
+
+* **IP 주소**
 
   * **Router (Ubuntu)**: OUTSIDE `210.111.10.1/25`, MOBILITY `203.150.10.254/24`, **Default GW** `203.150.10.1`
   * **UTM (OPNsense)**:
-
     * OUTSIDE(WAN): `210.111.10.120/25` GW `210.111.10.1`
     * DMZ: `210.111.10.129/25`
     * INSIDE(LAN): **`192.168.1.1/24`**
@@ -33,45 +33,83 @@
   * **웹(www, Ubuntu)**: `210.111.10.150/25`, GW `210.111.10.129`
   * **공격자(attacker, Kali)**: `210.111.10.35/25`, GW `210.111.10.1`
   * **모바일(mobile, Ubuntu)**: `203.150.10.100/24`, GW `203.150.10.254`
-* **VPN(SSL/WireGuard)**: `10.2.43.0/24` (UTM: `10.2.43.1`, Mobile: `10.2.43.10` 예시)
-* **WAF**: UTM 상의 **Nginx(+ModSecurity/CRS)** 역방향 프록시로 구성, **WAN(210.111.10.120:80)** 에서 수신 → **DMZ www(210.111.10.150:80)** 로 프록시
+  * **VPN(SSL/WireGuard)**: `10.2.43.0/24` (UTM: `10.2.43.1`, Mobile: `10.2.43.42`)
+  * **WAF**: UTM 상의 **Nginx(+ModSecurity/CRS)** Reverse Proxy로 구성, **WAN(210.111.10.120:80)** 에서 수신 → **DMZ www(210.111.10.150:80)** 로 프록시
+
+* **Ubuntu 호스트 기본 설정** *[ All Host ]*
+```vim
+nano /etc/hosts
+```
+>```vim
+>127.0.1.1 ubuntu ubuntu
+>```
+```vim
+nano /etc/ssh/sshd_config
+```
+>```vim
+>Port 22
+>PermitRootLogin yes
+>```
+```vim
+systemctl enable ssh
+systemctl restart ssh
+timedatectl set-timezone Asia/Seoul
+hwclock -w
+tee /etc/sysctl.d/99-sysctl-apply.conf > /dev/null << EOF
+net.ipv4.ip_forward=1
+net.ipv6.conf.all.disable_ipv6=1
+net.ipv6.conf.lo.disable_ipv6=1
+net.ipv6.conf.default.disable_ipv6=1
+EOF
+sysctl --system
+```
+```vim
+nano /etc/rc.local
+```
+>```vim
+>#!/bin/bash
+>sysctl --system
+>```
+```vim
+chmod +x /etc/rc.local
+systemctl restart rc-local
+```
 
 ---
 
-## 1) 공통 사전 작업 (모든 Ubuntu/Kali)
+## 1) 공통 사전 작업 (모든 호스트 Ubuntu/UTM/Kali)
 
-> 사용자 계정: `bob_user`(Ubuntu), `kali`(Kali).
+> 사용자 계정: `root`(UTM), `bob_user`(Ubuntu), `kali`(Kali).
 
 ### 1-1. 호스트명 설정
 
 ```vim
-hostnamectl set-hostname <client|server|www|router|mobile|attacker>
-```
-
-### 1-2. IPv6 비활성화(영구)
-
-```vim
-tee /etc/sysctl.d/99-sysctl-apply.conf >/dev/null << EOF
-net.ipv6.conf.all.disable_ipv6 = 1
-net.ipv6.conf.default.disable_ipv6 = 1
-net.ipv6.conf.lo.disable_ipv6 = 1
-EOF
-sysctl --system
+hostnamectl set-hostname < client | server | www | router | mobile | attacker >
+sed -i "s/ubuntu/< client | server | www | router | mobile | attacker >/g" /etc/hosts
 ```
 
 ---
 
 ## 2) 네트워크 설정 (GUI)
 
+### 2-1. IP 주소 설정
+
 > Ubuntu 22.04 기준, 인터페이스명은 예시(`ens33`, `ens34`)이며 실제 값으로 치환.
 > 모든 호스트의 IP 설정은 모두 GUI로 설정 하도록 한다.
 
-### 2-1. router (IP 포워딩 활성화)
+### 2-2. 라우팅 설정 (router)
+- [ router ]
 ```vim
-tee /etc/sysctl.d/99-router-forward.conf > /dev/null << EOF
-net.ipv4.ip_forward = 1
-EOF
-sysctl --system
+nano /etc/rc.local
+```
+>```vim
+>#!/bin/bash
+>sysctl --system
+># DMZ Routing
+>ip route add 210.111.10.128/25 via 210.111.10.120 dev ens32
+>```
+```vim
+systemctl restart rc-local
 ```
 
 ---
@@ -190,7 +228,7 @@ sysctl --system
 > 배포물에 Docker 구성이 포함되어 있다고 가정.
 
 ```vim
-# 확인
+# 컨테이너 확인
 docker ps -a
 # DVWA 컨테이너 포트가 80로 뜨는지 확인
 ss -lntp | grep 80
@@ -202,40 +240,33 @@ ss -lntp | grep 80
 
 ## 5) mobile(클라이언트) WireGuard 설정
 
-### 5-1. 키 생성
-
-```vim
-umask 077
-wg genkey | tee /etc/wireguard/private.key | wg pubkey > /etc/wireguard/public.key
-cat /etc/wireguard/public.key   # → 값을 UTM Peer 설정에 등록
-```
-
-### 5-2. 클라이언트 설정파일(`/etc/wireguard/wg0.conf`)
+### 5-1. 클라이언트 설정파일(`/etc/wireguard/wg0.conf`)
 
 ```ini
 [Interface]
-Address = 10.2.43.10/24
+Address = 10.2.43.42/24
 PrivateKey = <mobile-private-key>
 
 [Peer]
 PublicKey = <UTM-public-key>
 Endpoint = 210.111.10.120:51820   # UTM WAN
-AllowedIPs = 10.2.43.1/32, 192.168.1.0/24
+AllowedIPs = 10.2.43.0/24, 192.168.1.0/24
 PersistentKeepalive = 25
 ```
 
-### 5-3. 가동/부팅연동
+### 5-2. 가동/부팅연동
 
 ```vim
-sudo systemctl enable --now wg-quick@wg0
-ip a show wg0
-ping -c2 10.2.43.1
-ping -c2 192.168.1.10  # INSIDE server와 통신되어야 함
+wg-quick up wg0
+systemctl enable --now wg-quick@wg0
+ip addr show wg0
+ping -c 2 10.2.43.1
+ping -c 2 192.168.1.10  # INSIDE server와 통신되어야 함
 ```
 
 ---
 
-## 6) 검증 시나리오(필수)
+## 6) 검증 시나리오 (필수)
 
 ### 6-1. ICMP 전면 허용 확인
 
@@ -246,7 +277,7 @@ ping -c2 192.168.1.10  # INSIDE server와 통신되어야 함
 ```vim
 # client(INSIDE) → www(DMZ)
 curl -I http://210.111.10.150   # 200 OK
-ping -c2 210.111.10.150         # 성공
+ping -c 2 210.111.10.150         # 성공
 
 # server(INSIDE) → DMZ/OUTSIDE는 차단되어야 함
 curl -I http://210.111.10.150   # 실패 (방화벽 로그 체크)
@@ -263,12 +294,12 @@ curl -I http://210.111.10.150   # 실패
 curl -I http://210.111.10.120   # 200/301 등 프록시 응답
 ```
 
-### 6-4. WAF 차단 테스트(명령주입)
+### 6-4. WAF 차단 테스트 (Command Injection)
 
 ```vim
 # DVWA의 Command Injection 페이지 (로그인/보안레벨 조정 후)
-# 공격 페이로드 예: localhost && ls -l
-curl "http://210.111.10.120/vulnerabilities/exec/?ip=210.111.10.35;id&Submit=Submit#"
+# 공격 페이로드 : localhost && ls -l
+curl "http://210.111.10.120/vulnerabilities/exec/#"
 # → ModSecurity 차단 페이지/403 확인
 ```
 
@@ -276,11 +307,11 @@ curl "http://210.111.10.120/vulnerabilities/exec/?ip=210.111.10.35;id&Submit=Sub
 
 ```vim
 # mobile에서
-ping -c2 10.2.43.1       # UTM WG 터널
-ping -c2 192.168.1.10    # INSIDE server
+ping -c 2 10.2.43.1       # UTM WG 터널
+ping -c 2 192.168.1.10    # INSIDE server
 
 # server에서 VPN 대역과 통신 허용 확인(다른 외부는 차단 유지)
-ping -c2 10.2.43.10
+ping -c 2 10.2.43.42
 ```
 
 ---
