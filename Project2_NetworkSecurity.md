@@ -197,6 +197,7 @@ systemctl restart rc-local
   * **Location**
     * Description: `www_waf`
     * URL Pattern: `/`
+    * Enable Security Rules: **Enable**
     * CSP: `Command Inection: 1700`
     * Upstream Servers: `www_waf`
     * Index File: `index.php`
