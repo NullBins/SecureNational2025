@@ -1,7 +1,6 @@
 ---
 
 # 🛡 사이버 보안 *Cyber Security* 🔐
-## 🖋 *Written by **Donghyun Choi*** (**KGU**)
 ###### ⚔ - Worldskills Korea ▫ National 2025 (Cyber Security Practices) - 🏹 [ *Written by NullBins* ]
 - By default, the commands are executed as a root user.
 
