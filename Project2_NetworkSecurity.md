@@ -13,7 +13,7 @@
 
 ---
 
-## 0) 전체 토폴로지(주소 요약) 호스트 기본 설정 사항
+## 0) 전체 토폴로지(주소 요약), 호스트 기본 설정 사항
 
 * **네트워크 대역**
 
@@ -90,9 +90,9 @@ sed -i "s/ubuntu/< client | server | www | router | mobile | attacker >/g" /etc/
 
 ---
 
-## 2) 네트워크 설정 (GUI)
+## 2) 네트워크 설정
 
-### 2-1. IP 주소 설정
+### 2-1. IP 주소 설정 (GUI)
 
 > Ubuntu 22.04 기준, 인터페이스명은 예시(`ens33`, `ens34`)이며 실제 값으로 치환.
 > 모든 호스트의 IP 설정은 모두 GUI로 설정 하도록 한다.
@@ -116,110 +116,115 @@ systemctl restart rc-local
 
 ## 3) UTM(OPNsense 25.1) 설정
 
-> 콘솔/웹UI 기반. 플러그인(nginx, modsecurity, wireguard)은 배포 이미지에 포함되는 것으로 한다. 재부팅 없이 대부분 적용 가능.
+> 콘솔/웹UI 기반. 플러그인(NGINX, ModSecurity, WireGuard)은 배포 이미지에 포함되는 것으로 한다. 재부팅 없이 대부분 적용 가능.
 
-### 3-1. 인터페이스/주소
+### 3-1. 인터페이스/IP주소
 
 * **Interfaces → Assignments**
-
-  * **WAN(OUTSIDE)**: `210.111.10.120/25`, **Gateway** `210.111.10.1`
+  * **WAN(OUTSIDE)**: `210.111.10.120/25`, **GW**: `210.111.10.1`
   * **DMZ**: `210.111.10.129/25`
   * **LAN(INSIDE)**: **`192.168.1.1/24`**
 
-### 3-2. 시스템 전역
+### 3-2. IPv6 비활성 및 DHCPv4 서버 활성화
 
 * **System → Settings → General**
+  * IPv6 관련 기능 비활성(Prefer IPv4 over IPv6)
 
-  * IPv6 관련 기능 비활성(Prefer IPv4, IPv6 off)
-* **Firewall → Settings → Advanced**
-
-  * **Block IPv6** 체크
-* **Services → DHCPv4 → LAN**
-
-  * 범위: `192.168.1.100 - 192.168.1.200`
+* **Services → ISC DHCPv4 → [LAN]**
+  * 범위: `192.168.1.100 - 192.168.1.199`
   * 기본 게이트웨이: `192.168.1.1`
 
-### 3-3. NAT
+### 3-3. NAT 설정
 
 * **Firewall → NAT → Outbound**
-
-  * 모드: **Hybrid**
-  * 규칙1(일반 내부 NAT):
-
+  * Mode: **Hybrid**
+  * NAT-Rule-1 (INSIDE WAN SNAT):
     * Interface: **WAN**
-    * Source: `192.168.1.0/24` **except** `192.168.1.10/32`(server 제외)
+    * Source: `192.168.1.0/24`
+    * Destination: `any`
     * Translation / Address: **`210.111.10.120`**
-  * 규칙2(서버 비NAT):
-
-    * Interface: **WAN/DMZ**
+  * NAT-Rule-2 (Server NO NAT):
+    * Interface: **WAN**
     * Source: `192.168.1.10/32`
-    * Translation: **NO NAT** (또는 `Disable NAT` 동등 옵션)
+    * Translation: **Do not NAT**
+  * NAT-Rule-3 (INSIDE DMZ SNAT):
+    * Interface: **DMZ**
+    * Source: `192.168.1.0/24`
+    * Destination: `210.111.10.128/25`
+    * Translation / Address: **`210.111.10.120`**
 
-### 3-4. 방화벽 규칙(모든 규칙 **Log** 활성)
+### 3-4. 방화벽 규칙 (모든 규칙 *Log* 활성)
 
-* **Floating 또는 각 인터페이스 상단에 IPv6 Drop**
+* **Firewall → Rules → Floating**
+  * Action: **Block**, `IPv6: any - any` (proto: **ANY**)
+  * Action: **Pass**, Iface: WAN, `IPv4: any - any` (proto: **ICMP**)
+  * Action: **Block**, `IPv4: 192.168.1.10/32 - 210.111.10.35/32` (proto: **ICMP**)
+  * Action: **Block**, `IPv4: 192.168.1.10/32 - 210.111.10.150/32` (proto: **ICMP**)
+  * Action: **Pass**, Iface: WAN `IPv4: 203.150.10.100/32 - 210.111.10.120/32` (proto: **UDP/51820**)
+  * Action: **Pass**, Iface: WireGuard `IPv4: 10.2.43.0/24 - 192.168.1.10/32` (proto: **ANY**)
+  * Action: **Pass**, Iface: WAN `IPv4: 210.111.10.35/32 - 210.111.10.120/32` (proto: **TCP/80**)
 
-  * Action: **Block**, IPv6 **any-any**
-* **ICMP 허용(전역)**
-
-  * 각 인터페이스에 `IPv4 ICMP any-any` **Pass**
-* **LAN(INSIDE) → DMZ**
-
-  * **허용**: `TCP 80(HTTP)` + `ICMP`
-  * **차단(우선순위 상단)**: server(`192.168.1.10`) → DMZ **any**
-* **LAN(INSIDE) → OUTSIDE/MOBILITY**
-
-  * **허용**: `IPv4 *` (단, server는 아래 규칙으로 제한)
-* **LAN(server) 예외**
-
-  * **차단**: server(`192.168.1.10`) → OUTSIDE **any**
-  * **차단**: server(`192.168.1.10`) → DMZ **any**
-  * **허용**: server(`192.168.1.10`) ↔ **WireGuard 대역 `10.2.43.0/24`**
-* **WAN 수신(OUTSIDE)**
-
-  * **허용**: `TCP 80` → **This firewall** (Nginx 프록시용)
-  * **허용**: `UDP 51820` → **This firewall** (WireGuard)
-  * **차단**: OUTSIDE → DMZ **직접** 접근(예: `DMZ net any` 명시 Block)
-* **DMZ →** (기본 정책 최소화, 필요 트래픽만 허용)
-
-  * DMZ → WAN 기본 차단, DMZ → LAN 기본 차단(과제 요구 외 불필요 트래픽 방지)
-
-### 3-5. WAF (Nginx + ModSecurity/CRS)
-
-* **Services → Nginx → Upstreams**
-
-  * Name: `dmz_www_pool`
-  * Server: `210.111.10.150:80`
-* **Services → Nginx → HTTP(S) → Server**
-
-  * Name: `waf_www`
-  * Listen Interface: **WAN(210.111.10.120)**
-  * Listen Port: **80**
-  * Locations: `/` → Upstream `dmz_www_pool`
-  * **Enable ModSecurity** + **CRS 활성화**, **Mode: Block**
-* **Firewall 연계**: 위의 **WAN:80 → This firewall** 허용 규칙이 반드시 필요. OUTSIDE/MOBILITY에서 **DMZ www 직접 접근**은 방화벽에서 **차단**. INSIDE는 **직접**(DMZ IP로) 또는 **WAF 경유** 모두 허용 상태.
-
-### 3-6. WireGuard(SSL VPN)
+### 3-5. WireGuard(SSL VPN)
 
 * **VPN → WireGuard**
-
-  * **Local(UTM)**
-
-    * Name: `wg0`
+  * **Instance(UTM)**
+    * Name: `WireGuard`
+    * Instance: `wg0`
     * Listen Port: `51820`
     * Tunnel Address: `10.2.43.1/24`
-  * **Peer(mobile)**
-
+    * Peers: `mobile`
+  * **Peers(mobile)**
+    * Name: mobile
     * Public Key: *(mobile에서 생성한 키)*
-    * Allowed IPs: `10.2.43.10/32`
-    * Endpoint: *(로밍/공인IP 불명 → 공란, Persistent keepalive 25s)*
-* **Firewall**
+    * Allowed IPs: `10.2.43.42/32`
+    * Endpoint: `210.111.10.120:51820`
+    * Instance: `WireGuard`
+    * Persistent keepalive: **25s**
 
-  * **WAN**: `UDP/51820` 허용(위에서 설정)
-  * **WireGuard 인터페이스 그룹** 생성 후, `WG → LAN(server)`/`LAN(server) → WG` 상호 허용
-* **Routes**
+### 3-6. WAF (NGINX + ModSecurity/CRS)
 
-  * `10.2.43.0/24`는 WireGuard 인터페이스에 로컬로 존재 → 별도 정적 라우팅 불필요. 단, LAN에서 WG로의 정책 허용 필수.
+* **Services → Nginx → Configuration**
+  * **Upstream Server**
+    * Description: `www`
+    * Server: `210.111.10.120`
+    * Port: `51820`
+    * Priority: `1`
+  * **Upstream**
+    * Description: `www_waf`
+    * Server Entries: `www`
+  * **Location**
+    * Description: `www_waf`
+    * URL Pattern: `/`
+    * CSP: `Command Inection: 1700`
+    * Upstream Servers: `www_waf`
+    * Index File: `index.php`
+  * **HTTP Server**
+    * HTTP Listen: `80`
+    * Default Server: **Enable**
+    * Server Name: `www_waf`
+    * Locations: `www_waf`
+    * File System Root: `/`
+  * **Naxsi WAF Rule**
+    * Description: *Command Injection*
+    * Message: *Command Injection Detected*
+    * ID: `1700`
+    * Rule Type: **Main Rule**
+    * Match Value: `&&`
+    * Match Type: **Blacklist**
+    * Search in GET/URL/HEADER/POST: **Enable**
+    * Score: `8`
+  * **Naxsi WAF Policy**
+    * Name: `Command Injection: 1700`
+    * Rule: `Command Injection`
+    * Value: `8`
+
+> 📢 중요사항: 반드시 Command Injection Rule 생성할때 Score 8 이상으로 해야 정책 적용시 차단된다. ⭐
+
+---
+
+### UTM 설정 화면 이미지
+> 🖼 OPNsense 25.1 UTM 설정 사진 자료
+> ![Image]()
 
 ---
 
@@ -230,7 +235,7 @@ systemctl restart rc-local
 ```vim
 # 컨테이너 확인
 docker ps -a
-# DVWA 컨테이너 포트가 80로 뜨는지 확인
+# DVWA 서버 포트가 80로 뜨는지 확인
 ss -lntp | grep 80
 ```
 
@@ -270,7 +275,7 @@ ping -c 2 192.168.1.10  # INSIDE server와 통신되어야 함
 
 ### 6-1. ICMP 전면 허용 확인
 
-* `client / server / www / router / mobile / attacker` 각 호스트에서 상호 **ping** 정상.
+* `client / server / www / router / mobile / attacker` 각 호스트에서 상호 **ping** 정상 확인.
 
 ### 6-2. INSIDE → DMZ
 
