@@ -7,7 +7,7 @@
 - ❗❗ **Never attempt to use this guide on a commercial site or server. You do so at your own risk.** ❗❗
 - ❗❗ **절대로 이 가이드를 보고 상용 중인 사이트나 서버에 시도하지 마십시오. 해당행위로 생기는 책임은 본인에게 있습니다.** ❗❗
 
-# [ *Project-3* ] <*⚔Hacking Project🛠*>
+# [ *Project-3* ] <*⚔Hacking Guides🛠*>
 
 ---
 
