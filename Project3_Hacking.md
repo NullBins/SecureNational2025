@@ -59,3 +59,4 @@ document.write = "You have been Hacked!";
 ---
 
 ## 2. 🛠리버스 엔지니어링 (Reverse Engineering)
+- 도구: radare2, ghidra, gdb, objdump
