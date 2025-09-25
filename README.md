@@ -1,17 +1,17 @@
 <div align="center">
   <h1> 🛡 [ Cyber Security ] 사이버 보안 🔐 </h1>
   <h3> ⚔ - Worldskills Korea ▫ National 2025 `Cyber Security Assignment Practices` - 🏹 </h3>
-  <h5> 🏆 2025년 전국기능경기대회 사이버보안 대회 연습 🥇 </h5>
+  <h5> < 2025년 전국기능경기대회 사이버보안 대회 연습  ></h5>
   <p> - 📅 Schedule : < <b>2025. 09. 20(토). ~ 2025. 09. 26(금). [ 7 Days ]</b> > - </p>
 </div>
 
 ## 🛡 1과제 (*Infrastructure configuration & Security enhancements*) 🔐
-- 핵심 기술(Core Skills) : ``Docker, Tomcat, MariaDB``
-- 1과제 솔루션(Assignmnet Solutions) : [[Infrastructure Security](https://github.com/NullBins/SecureNational2025/blob/main/Project1_InfraSecurity.md)]
+- 핵심 기술(Core Keyword) : ``Docker, Tomcat, MariaDB``
+- 1과제 솔루션(Assignmnet Solutions) : [[Infrastructure Security](https://github.com/NullBins/SecureNational2025/blob/main/Project1_InfraSecurity.pdf)]
 
 ## 🧱 2과제 (*Network security device settings*) ⚒
-- 핵심 기술(Core Skills) : ``UTM, Traffic Control, WAF, VPN``
-- 2과제 솔루션(Assignmnet Solutions) : [[Network Security](https://github.com/NullBins/SecureNational2025/blob/main/Project2_NetworkSecurity.md)]
+- 핵심 기술(Core Keyword) : ``UTM, Traffic Control, WAF, VPN``
+- 2과제 솔루션(Assignmnet Solutions) : [[Network Security](https://github.com/NullBins/SecureNational2025/blob/main/Project2_NetworkSecurity.pdf)]
 
 ## ⚔ 3과제 (*CTF Hacking*) 🗡
 - 출제 카테고리(Key Words) : ``Decryption, Reverse Engineering, Steganography, Web Hacking``
