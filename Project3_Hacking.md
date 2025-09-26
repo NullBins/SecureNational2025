@@ -2,7 +2,7 @@
 
 # 🛡 사이버 보안 *Cyber Security* 🔐
 ## 🖋 *Written by **Donghyun Choi*** (**KGU**)
-###### ⚔ - Worldskills Korea ▫ National 2025 (Cyber Security Practices) - 🏹 [ *Written by NullBins* ]
+###### ⚔ - Worldskills Korea ▫ National 2025 (Cyber Security Practice) - 🏹 [ *Written by NullBins* ]
 - By default, Solves problems using only Kali Linux.
 - ❗❗ **Never attempt to use this guide on a commercial site or server. You do so at your own risk.** ❗❗
 - ❗❗ **절대로 이 가이드를 보고 상용 중인 사이트나 서버에 시도하지 마십시오. 해당행위로 생기는 책임은 본인에게 있습니다.** ❗❗
