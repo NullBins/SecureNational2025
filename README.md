@@ -1,6 +1,6 @@
 <div align="center">
   <h1> 🛡 [ Cyber Security ] 사이버 보안 🔐 </h1>
-  <h3> ⚔ - Worldskills Korea ▫ National 2025 `Cyber Security Assignment Practices` - 🏹 </h3>
+  <h3> ⚔ - Worldskills Korea ▫ National 2025 `Cyber Security Assignment Practice` - 🏹 </h3>
   <h5> < 2025년 전국기능경기대회 사이버보안 대회 연습  ></h5>
   <p> - 📅 Schedule : < <b>2025. 09. 20(토). ~ 2025. 09. 26(금). [ 7 Days ]</b> > - </p>
 </div>
