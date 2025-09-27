@@ -8,6 +8,7 @@
 ## 🛡 1과제 (*Infrastructure configuration & Security enhancements*) 🔐
 - 핵심 기술(Core Keyword) : ``Docker, Tomcat, MariaDB``
 - 1과제 솔루션(Assignmnet Solutions) : [[Infrastructure Security](https://github.com/NullBins/SecureNational2025/blob/main/Project1_InfraSecurity.pdf)]
+> [![Project1](http://img.youtube.com/vi/Udeu_1Iuync/0.jpg)](https://www.youtube.com/watch?v=Udeu_1Iuync)
 
 ## 🧱 2과제 (*Network security device settings*) ⚒
 - 핵심 기술(Core Keyword) : ``UTM, Traffic Control, WAF, VPN``
